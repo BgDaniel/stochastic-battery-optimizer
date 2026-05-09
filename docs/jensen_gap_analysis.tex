@@ -1,0 +1,521 @@
+\documentclass[11pt, a4paper]{article}
+
+% ── fonts & encoding ────────────────────────────────────────────────────────
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{mathpazo}          % Palatino for text + math
+\usepackage{eulervm}           % Euler math font (AMS-style)
+\linespread{1.08}
+
+% ── math ────────────────────────────────────────────────────────────────────
+\usepackage{amsmath, amssymb, amsthm}
+\usepackage{mathtools}
+
+% ── layout ──────────────────────────────────────────────────────────────────
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{microtype}
+\usepackage{parskip}
+
+% ── figures & tables ────────────────────────────────────────────────────────
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{booktabs}
+
+% ── hyperlinks ───────────────────────────────────────────────────────────────
+\usepackage[colorlinks=true, linkcolor=black, citecolor=black, urlcolor=blue]{hyperref}
+
+% ── theorem environments ─────────────────────────────────────────────────────
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{remark}[theorem]{Remark}
+
+% ── notation ─────────────────────────────────────────────────────────────────
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\C}{\mathcal{C}}
+\newcommand{\pbar}{\bar{p}}
+\newcommand{\xstar}{x^*}
+
+% ═══════════════════════════════════════════════════════════════════════════
+\begin{document}
+% ═══════════════════════════════════════════════════════════════════════════
+
+\title{%
+  \large\textsc{Stochastic Battery Valuation}\\[0.4em]
+  \LARGE\textbf{The Jensen Gap, Polytope Vertices,\\[0.2em]
+  and the Convexity of the Daily Value Function}\\[0.5em]
+  \normalsize Technical Note
+}
+\author{}
+\date{\today}
+\maketitle
+\tableofcontents
+\newpage
+
+% ────────────────────────────────────────────────────────────────────────────
+\section{Setting}
+% ────────────────────────────────────────────────────────────────────────────
+
+We consider a grid-scale electrical storage asset optimised over a
+discrete set of trading days $d = 0, 1, \ldots, D{-}1$.
+On each day $d$ the asset observes 24 hourly day-ahead prices
+$p \in \R^{24}$ and chooses a dispatch schedule
+$x = (e^{\mathrm{in}}, e^{\mathrm{out}}) \in \R^{48}$
+subject to the physical constraints of the storage device.
+
+The \emph{feasible set} for a given start-of-day energy level
+$s_0 \in [s_{\min}, s_{\max}]$ and end-of-day level
+$s_1 \in [s_{\min}, s_{\max}]$ is the convex polytope
+\begin{equation}
+  \C(s_0, s_1)
+  \;=\;
+  \Bigl\{
+    (e^{\mathrm{in}}, e^{\mathrm{out}}) \in \R^{48}
+    \;\Big|\;
+    \text{capacity, energy-path, and balance constraints}
+  \Bigr\},
+  \label{eq:feasible}
+\end{equation}
+where the balance constraint enforces
+$\sum_h e^{\mathrm{in}}_h - \sum_h e^{\mathrm{out}}_h = s_1 - s_0$.
+A precise statement is given in Appendix~\ref{app:lp}.
+
+The \emph{one-day value function} is
+\begin{equation}
+  F(p; s_0, s_1)
+  \;=\;
+  \max_{x \in \C(s_0, s_1)}
+  \langle c(p),\, x \rangle,
+  \qquad
+  c(p)_h
+  =
+  \begin{pmatrix}
+    -p_h / \eta_c \\
+    p_h \cdot \eta_d
+  \end{pmatrix},
+  \label{eq:F}
+\end{equation}
+where $\eta_c$ and $\eta_d$ are the charging and discharging efficiencies.
+Since we discovered empirically that the optimal end-of-day energy level
+tends to equal $s_{\min}$ (the battery is fully dispatched within each day),
+we simplify below by fixing $s_0 = s_1 = s_{\min}$ and write
+$F(p) \equiv F(p; s_{\min}, s_{\min})$.
+
+% ────────────────────────────────────────────────────────────────────────────
+\section{Convexity of \texorpdfstring{$F$}{F}}
+% ────────────────────────────────────────────────────────────────────────────
+
+\begin{proposition}
+$F : \R^{24} \to \R$ is \emph{convex} and \emph{piecewise linear}.
+\end{proposition}
+\begin{proof}
+$F(p) = \sup_{x \in \C} \langle c(p), x \rangle$ is the pointwise
+supremum of the family of linear functions $\{p \mapsto \langle c(p), x \rangle\}_{x \in \C}$.
+Since $\C$ is a polytope (finitely many vertices), the supremum is over
+a finite family of linear functions and is therefore convex and piecewise linear.
+\end{proof}
+
+\begin{remark}
+The kink points of $F$ — where the optimal vertex changes — correspond
+exactly to the \emph{vertex switches} visible in the cross-section plots
+(orange dashed lines in Figure~\ref{fig:cross}).
+Between consecutive kinks, $F$ is perfectly linear and the gradient equals
+the optimal dispatch $\xstar(p)$ evaluated at any interior point.
+\end{remark}
+
+% ────────────────────────────────────────────────────────────────────────────
+\section{The Jensen Gap}
+% ────────────────────────────────────────────────────────────────────────────
+
+\subsection{Definition}
+
+Let $p_1, \ldots, p_N \in \R^{24}$ be $N$ Monte Carlo price scenarios for
+day~$d$.  Define
+\begin{equation}
+  V^{\mathrm{full}}
+  \;=\;
+  \frac{1}{N} \sum_{i=1}^N F(p_i)
+  \;=\;
+  \E\bigl[F(p_i)\bigr],
+  \qquad
+  V^{\mathrm{intr}}
+  \;=\;
+  F\!\left(\frac{1}{N}\sum_{i=1}^N p_i\right)
+  \;=\;
+  F(\pbar).
+\end{equation}
+
+\begin{definition}[Jensen gap]
+The \emph{Jensen gap} for day~$d$ is
+\begin{equation}
+  \Delta
+  \;=\;
+  V^{\mathrm{full}} - V^{\mathrm{intr}}
+  \;=\;
+  \E[F(p_i)] - F(\pbar)
+  \;\geq\; 0.
+  \label{eq:gap}
+\end{equation}
+It equals the \emph{extrinsic value} for that day.
+\end{definition}
+
+The non-negativity follows immediately from Jensen's inequality applied
+to the convex function $F$.
+
+\subsection{Decomposition via individual contributions}
+
+Define the individual contribution of scenario $i$ as
+\begin{equation}
+  \delta_i \;=\; F(p_i) - F(\pbar).
+\end{equation}
+Then $\Delta = \frac{1}{N}\sum_i \delta_i = \E[\delta_i]$.
+Figure~\ref{fig:hist} shows the empirical distribution of $\delta_i$:
+its mean is the Jensen gap; a distribution narrow and centred near zero
+implies a negligible gap.
+
+\subsection{First-order approximation}
+
+Since $F$ is piecewise linear, let $\xstar(\pbar)$ denote the optimal
+dispatch at $\pbar$ (an element of the subdifferential $\partial F(\pbar)$).
+The tangent approximation gives
+\begin{equation}
+  F(p_i)
+  \;\approx\;
+  F(\pbar) + \langle \xstar(\pbar),\, p_i - \pbar \rangle
+  \quad
+  \text{when $p_i$ and $\pbar$ lie in the same linear region of $F$.}
+\end{equation}
+Averaging over $i$:
+\begin{equation}
+  \E[F(p_i)]
+  \;\approx\;
+  F(\pbar) + \langle \xstar(\pbar),\, \underbrace{\E[p_i] - \pbar}_{=\,0} \rangle
+  \;=\;
+  F(\pbar).
+\end{equation}
+Hence $\Delta \approx 0$ whenever all scenarios remain in the same
+linear region as $\pbar$.  The gap is non-trivial only if scenarios
+\emph{cross a kink point} of $F$.
+
+% ────────────────────────────────────────────────────────────────────────────
+\section{Geometric Interpretation: Polytope Vertices}
+% ────────────────────────────────────────────────────────────────────────────
+
+\subsection{Finite vertex set}
+
+The feasible set $\C$ is a polytope.  By the fundamental theorem of
+linear programming, the optimum of any LP over $\C$ is attained at a
+\emph{vertex}.  Therefore for each price scenario $p_i$ there exists
+a vertex $v_i \in \mathrm{vert}(\C)$ such that
+\begin{equation}
+  F(p_i) \;=\; \langle c(p_i),\, v_i \rangle.
+\end{equation}
+
+\begin{proposition}[Finite vertex count]
+The polytope $\C(s_0, s_1)$ has finitely many vertices.
+For a 24-hour dispatch problem with $H = 24$ hours,
+the number of vertices is bounded by $\binom{2H}{H}$ (the number of
+basic feasible solutions of the underlying LP),
+though in practice far fewer are active.
+\end{proposition}
+
+\subsection{Vertex dominance and the Jensen gap}
+
+Let $\mathcal{V} = \{v^{(1)}, \ldots, v^{(K)}\}$ be the set of vertices
+that are optimal for at least one scenario.  The value function can be
+written as
+\begin{equation}
+  F(p) \;=\; \max_{k=1,\ldots,K} \langle c(p),\, v^{(k)} \rangle.
+\end{equation}
+Each $p \mapsto \langle c(p), v^{(k)} \rangle$ is linear.
+The \emph{active vertex regions}
+\begin{equation}
+  R_k \;=\; \{p \in \R^{24} : v^{(k)} \text{ is optimal at } p\}
+\end{equation}
+partition (a.e.) the price space.
+
+\begin{theorem}[Vertex dominance implies small gap]
+  If all scenarios $p_1, \ldots, p_N$ lie in the same region $R_k$,
+  then $F(p_i) = \langle c(p_i), v^{(k)} \rangle$ for all $i$, and
+  \begin{equation}
+    \Delta
+    \;=\;
+    \E[F(p_i)] - F(\pbar)
+    \;=\;
+    \bigl\langle c(\E[p_i]),\, v^{(k)} \bigr\rangle
+    - \bigl\langle c(\pbar),\, v^{(k)} \bigr\rangle
+    \;=\; 0.
+  \end{equation}
+\end{theorem}
+
+\begin{remark}[Empirical finding]
+  Numerical experiments with realistic German day-ahead price scenarios
+  show that \textbf{the vast majority of scenarios activate the same vertex}
+  as the mean price path.  The $k$-means clustering of dispatch profiles
+  (Figure~\ref{fig:clusters}) reveals that one cluster accounts for
+  over 90\% of scenarios on most days, confirming vertex dominance and
+  explaining the near-zero extrinsic value observed in practice.
+\end{remark}
+
+% ────────────────────────────────────────────────────────────────────────────
+\section{Cross-Sectional Analysis of \texorpdfstring{$F$}{F}}
+% ────────────────────────────────────────────────────────────────────────────
+
+\subsection{The normal direction}
+
+At $\pbar$ the subdifferential of $F$ is $\partial F(\pbar) \ni \xstar(\pbar)$.
+The \emph{zero-space} of the subdifferential is
+\begin{equation}
+  \ker(\xstar(\pbar))
+  \;=\;
+  \{d \in \R^{24} : \langle \xstar(\pbar), d \rangle = 0\},
+\end{equation}
+the set of price directions that do not change the optimal revenue to
+first order.  The complementary direction — maximising the first-order
+change — is
+\begin{equation}
+  v \;=\; \frac{\xstar(\pbar)}{\|\xstar(\pbar)\|}.
+  \label{eq:vdir}
+\end{equation}
+
+\subsection{The 1-D cross-section}
+
+We plot
+\begin{equation}
+  t \;\longmapsto\; F(\pbar + t\,v),
+  \qquad
+  t \in \bigl[-n_\sigma \cdot \sigma,\; n_\sigma \cdot \sigma\bigr],
+\end{equation}
+where $\sigma = \mathrm{std}(t_i)$ and $t_i = \langle p_i - \pbar, v\rangle$
+are the scenario projections onto $v$.
+
+The tangent at $t = 0$ is
+\begin{equation}
+  t \;\longmapsto\;
+  F(\pbar) + t \cdot \langle \xstar(\pbar),\, v \rangle
+  \;=\;
+  F(\pbar) + t \cdot \|\xstar(\pbar)\|,
+\end{equation}
+since $\langle \xstar(\pbar), v \rangle = \|\xstar(\pbar)\|^2 / \|\xstar(\pbar)\| = \|\xstar(\pbar)\|$.
+
+The \emph{convexity gap} $F(\pbar + tv) - \text{tangent}(t) \geq 0$
+is the pointwise excess above the tangent.  It is zero within a linear
+region and positive at kink crossings.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\textwidth]{figures/cross_section.pdf}
+  \caption{%
+    Cross-section of $F$ along $v = \xstar(\pbar)/\|\xstar(\pbar)\|$
+    for an example day.
+    \textit{Top:} Blue curve — $F(\pbar + tv)$; navy dashed — tangent at $t=0$;
+    red shading — convexity gap; orange dashed — vertex switch points.
+    Secondary axis (tomato): gap $F - \text{tangent}$.
+    \textit{Bottom:} Histogram of scenario projections $t_i$;
+    orange dashed lines align with vertex switches in the upper panel.
+    The scenarios cluster tightly around $t=0$, confirming small gap.
+  }
+  \label{fig:cross}
+\end{figure}
+
+\subsection{Key observation: asymmetric convexity}
+
+The cross-section plots consistently show that $F$ is \textbf{strongly
+convex for $t < 0$} (price moving against the optimal dispatch direction)
+but \textbf{nearly linear for $t > 0$}.  This asymmetry arises because:
+
+\begin{itemize}
+  \item For $t > 0$: the current optimal dispatch $\xstar(\pbar)$ becomes
+    even more profitable; the same vertex remains optimal and $F$ stays linear.
+  \item For $t < 0$: the current dispatch becomes suboptimal; the LP must
+    switch to a different vertex (different charge/discharge schedule),
+    producing the observed kinks and curvature.
+\end{itemize}
+
+Since real price scenarios are centred near $\pbar$ and the convexity
+appears predominantly at $t < 0$, the scenarios rarely reach the curved
+region, and $\Delta \approx 0$.
+
+% ────────────────────────────────────────────────────────────────────────────
+\section{Dispatch Cluster Analysis}
+% ────────────────────────────────────────────────────────────────────────────
+
+To visualise vertex dominance directly, we apply $k$-means clustering
+($k = 5$) to the 48-dimensional dispatch vectors
+$(e^{\mathrm{in}}_i, e^{\mathrm{out}}_i) \in \R^{48}$
+across all $N$ scenarios for a given day.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\textwidth]{figures/clusters.pdf}
+  \caption{%
+    $k$-means cluster analysis of optimal dispatch profiles for an
+    example day.  \textit{Top:} Cluster frequencies (\%).
+    One cluster (C0) typically accounts for $> 90\%$ of scenarios.
+    \textit{Remaining rows:} Mean dispatch shape (green = discharge,
+    red = charge) and corresponding mean price shape per cluster.
+    The dominant cluster corresponds to the same vertex as the
+    intrinsic (mean-path) optimum.
+  }
+  \label{fig:clusters}
+\end{figure}
+
+The intra-cluster standard deviation $\sigma_k$ (annotated on each bar)
+quantifies how close the LP solutions within a cluster are.
+Small $\sigma_k$ confirms that each cluster genuinely corresponds to
+a small neighbourhood of a single polytope vertex.
+
+% ────────────────────────────────────────────────────────────────────────────
+\section{Jensen Gap as a Function of Battery Parameters}
+% ────────────────────────────────────────────────────────────────────────────
+
+The shape of $F$ — and therefore the Jensen gap — depends on the
+battery parameters through the feasible set $\C$.  Intuitively:
+
+\begin{itemize}
+  \item \textbf{Larger discharge power $P_d$}: more dispatch degrees of
+    freedom; more vertices are reachable; kink points appear at smaller
+    $|t|$; curvature increases; Jensen gap grows.
+  \item \textbf{Lower charge efficiency $\eta_c$}: raises the effective
+    charging cost; optimal dispatch shifts; the region around $\pbar$
+    where the current vertex is optimal may shrink.
+  \item \textbf{More energy levels}: finer SoC grid; richer continuation
+    value; more accurate dynamic programme but does not directly affect
+    the one-day convexity.
+\end{itemize}
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.92\textwidth]{figures/param_sensitivity.pdf}
+  \caption{%
+    Convexity comparison across battery parameters.
+    Two values of discharge power $P_d$ (left) and two values of
+    charging efficiency $\eta_c$ (right), each shown at full scale and
+    zoomed to the $\pm 2\sigma$ scenario range.
+    Larger $P_d$ or lower $\eta_c$ produces a wider and earlier-appearing
+    convexity gap, increasing the potential extrinsic value.
+  }
+  \label{fig:params}
+\end{figure}
+
+% ────────────────────────────────────────────────────────────────────────────
+\section{Value Function over the Energy Grid}
+% ────────────────────────────────────────────────────────────────────────────
+
+The LSMC backward induction computes the value function
+$V : \{s_{\min}, \ldots, s_{\max}\} \times \{1,\ldots,N\} \times \{0,\ldots,D{-}1\} \to \R$
+on a discrete energy grid.  For a fixed day $d$:
+
+\begin{equation}
+  V(s, \omega, d)
+  \;=\;
+  \max_{s' \in \text{grid},\; x \in \C(s, s')}
+  \Bigl[
+    \langle c(p^\omega_d), x \rangle
+    +
+    \hat{V}(s', d+1; p^\omega_d)
+  \Bigr],
+\end{equation}
+where $\hat{V}(\cdot, d+1; p)$ is the regressed continuation value
+obtained by least-squares regression of $V(\cdot, \cdot, d+1)$ on a
+polynomial basis in the mean daily price.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.75\textwidth]{figures/value_dist.pdf}
+  \caption{%
+    Value function $V(s, \cdot, d)$ for an example day as a function of
+    starting energy level $s$.
+    Mean (blue curve) with P5--P95 (light) and P10--P90 (dark) scenario
+    quantile bands.  Tomato dashed line: intrinsic value-to-go
+    $V^{\mathrm{intr}}(d) = V^{\mathrm{intr}}_{\mathrm{total}} - \sum_{d'<d} r_{d'}^{\mathrm{intr}}$.
+    The positive slope is the marginal EUR value of storing one extra MWh
+    at this day boundary.
+  }
+  \label{fig:vdist}
+\end{figure}
+
+% ────────────────────────────────────────────────────────────────────────────
+\section{Summary of Findings}
+% ────────────────────────────────────────────────────────────────────────────
+
+\begin{enumerate}
+  \item \textbf{$F$ is convex and piecewise linear.}
+    This is a mathematical consequence of the LP structure, not a modelling
+    assumption.  The Jensen inequality $\E[F(p_i)] \geq F(\pbar)$ therefore
+    holds with equality iff all scenarios lie in the same linear region.
+
+  \item \textbf{The Jensen gap is the extrinsic value for one day.}
+    The full (stochastic) value decomposes as
+    $V^{\mathrm{full}} = V^{\mathrm{intr}} + \Delta$,
+    where $\Delta \geq 0$ is the Jensen gap summed over all days.
+
+  \item \textbf{Vertex dominance explains a near-zero extrinsic value.}
+    Empirically, $> 90\%$ of scenarios activate the same LP vertex as the
+    mean price path.  When all scenarios share a vertex, $F$ is linear
+    on the scenario cloud and $\Delta = 0$ exactly.
+
+  \item \textbf{The convexity is asymmetric: strong for $t < 0$, weak for $t > 0$.}
+    Moving prices against the optimal dispatch (reducing spreads) forces
+    a vertex switch and creates curvature.  Moving prices in the favourable
+    direction keeps the current vertex and leaves $F$ linear.
+
+  \item \textbf{Wider kink regions arise with larger discharge capacity or lower efficiency.}
+    Batteries with more aggressive dispatch capabilities have more reachable
+    vertices, producing kinks at smaller deviations from $\pbar$ and
+    therefore larger potential Jensen gaps.
+
+  \item \textbf{The slope of $V(s, \cdot, d)$ measures marginal storage value.}
+    A steep positive slope indicates that an extra MWh of stored energy
+    at day boundary $d$ is worth carrying into the next day.
+    A flat $V$ implies the end-of-day SoC level does not matter for
+    continuation value.
+\end{enumerate}
+
+% ────────────────────────────────────────────────────────────────────────────
+\appendix
+\section{LP Formulation}
+\label{app:lp}
+% ────────────────────────────────────────────────────────────────────────────
+
+For horizon $H = 24$ hours, start energy $s_0$, end energy $s_1$,
+charge power limit $P_c$, discharge power limit $P_d$,
+time step $\Delta t$, min/max energy $[s_{\min}, s_{\max}]$:
+
+\textbf{Variables:} $e^{\mathrm{in}} \in \R^H$, $e^{\mathrm{out}} \in \R^H$.
+
+\textbf{Objective (maximise):}
+\begin{equation}
+  \sum_{h=0}^{H-1}
+  \Bigl(
+    p_h \cdot \eta_d \cdot e^{\mathrm{out}}_h
+    \;-\;
+    \frac{p_h}{\eta_c} \cdot e^{\mathrm{in}}_h
+  \Bigr).
+\end{equation}
+
+\textbf{Box constraints:}
+$0 \leq e^{\mathrm{in}}_h \leq P_c \Delta t$,\quad
+$0 \leq e^{\mathrm{out}}_h \leq P_d \Delta t$.
+
+\textbf{Energy balance:}
+$\displaystyle\sum_{h} e^{\mathrm{in}}_h - \sum_{h} e^{\mathrm{out}}_h = s_1 - s_0$.
+
+\textbf{Intra-day path constraints} (triangular matrix $L = \mathrm{tril}(\mathbf{1})$):
+\begin{align}
+  (Le^{\mathrm{in}} - Le^{\mathrm{out}})_h &\leq s_{\max} - s_0, \\
+  (Le^{\mathrm{out}} - Le^{\mathrm{in}})_h &\leq s_0 - s_{\min},
+  \qquad h = 0, \ldots, H{-}1.
+\end{align}
+
+These constraints ensure the running energy level
+$s_h = s_0 + \sum_{h'=0}^{h-1}(e^{\mathrm{in}}_{h'} - e^{\mathrm{out}}_{h'})$
+stays within $[s_{\min}, s_{\max}]$ at every hour.
+
+\end{document}
